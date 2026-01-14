@@ -1,0 +1,18 @@
+{
+    "files.associations": {
+        "mqtt_helper.h": "c",
+        "kernel_includes.h": "c",
+        "sys_clock.h": "c",
+        "modem_key_mgmt.h": "c",
+        "modem_info.h": "c",
+        "watchdog_app.h": "c",
+        "flash_map.h": "c",
+        "device.h": "c",
+        "watchdog.h": "c",
+        "shadow_payload.h": "c",
+        "connectivity_interface.h": "c",
+        "fleet_provisioning.h": "c",
+        "mqtt_pub_sub.h": "c"
+    },
+    "nrf-connect.applications": []
+}

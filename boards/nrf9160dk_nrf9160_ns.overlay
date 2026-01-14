@@ -1,0 +1,14 @@
+/*
+ * Copyright (c) 2023 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/* Enable uart1 for tracing. */
+
+externalsensor: &uart1 {
+	current-speed = <115200>;
+	status = "okay";
+	/*hw-flow-control;*/
+};
+

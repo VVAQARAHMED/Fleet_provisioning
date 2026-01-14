@@ -1,0 +1,41 @@
+// To get started, press Ctrl+Space to bring up the completion menu and view the available nodes.
+
+// You can also use the buttons in the sidebar to perform actions on nodes.
+// Actions currently available include:
+
+// * Enabling / disabling the node
+// * Adding the bus to a bus
+// * Removing the node
+// * Connecting ADC channels
+
+// For more help, browse the DeviceTree documentation at https://docs.zephyrproject.org/latest/guides/dts/index.html
+// You can also visit the nRF DeviceTree extension documentation at https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/ncs_configure_app.html#devicetree-support-in-the-extension
+
+
+externalsensor: &uart1 {
+	current-speed = <115200>;
+	status = "okay";
+    pinctrl-0 = <&uart1_default>;
+    pinctrl-1 = <&uart1_sleep>;
+    pinctrl-names = "default", "sleep";
+};
+
+&wdt {
+	status = "okay";
+};
+
+//&systick {
+//    status = "okay";
+//};
+
+//&clock {
+ //   status = "okay";
+//};
+
+//&kmu {
+ //   status = "disabled";
+//};
+
+//&power {
+ //   status = "disabled";
+//};
