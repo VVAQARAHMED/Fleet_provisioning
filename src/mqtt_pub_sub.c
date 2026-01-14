@@ -26,9 +26,9 @@ LOG_MODULE_REGISTER(mqtt_pub_sub, CONFIG_AWS_IOT_SAMPLE_LOG_LEVEL);
 /* Work items used to control some aspects of the sample. */
 static K_WORK_DELAYABLE_DEFINE(shadow_update_work, shadow_update_work_fn);
 static K_WORK_DELAYABLE_DEFINE(connect_work, connect_work_fn);
-static char config_set_topic[23];
-static char config_get_topic[23];
-static char data_from_cloud_topic[30];
+static char config_set_topic[32];
+static char config_get_topic[32];
+static char data_from_cloud_topic[32];
 static char data_to_cloud_topic[64];
 static char cred_topic[40];
 static struct mqtt_topic topic_list[3];
@@ -174,24 +174,17 @@ void mqtttopic_handler(const struct aws_iot_evt *const evt)
 			{
 				printf("Error: %s\n", error_ptr);
 			}
-			cJSON_Delete(json);
-			return 1;
+			return;
 		}
 		cJSON *rotate_cert = cJSON_GetObjectItemCaseSensitive(json, "rotate_cert");
-		if (rotate_cert != NULL)
+		if (rotate_cert != NULL && cJSON_IsNumber(rotate_cert))
 		{
-			if (cJSON_IsNumber(rotate_cert) && (rotate_cert->valueint != NULL))
-			{
-				printf("rotate_cert: %d\n", rotate_cert->valueint);
-			}
+			printf("rotate_cert: %d\n", rotate_cert->valueint);
 		}
 		cJSON *sec_tag = cJSON_GetObjectItemCaseSensitive(json, "sec_tag");
-		if (sec_tag != NULL)
+		if (sec_tag != NULL && cJSON_IsNumber(sec_tag))
 		{
-			if (cJSON_IsNumber(sec_tag) && (sec_tag->valueint != NULL))
-			{
-				printf("sec_tag: %d\n", sec_tag->valueint);
-			}
+			printf("sec_tag: %d\n", sec_tag->valueint);
 		}
 		if (rotate_cert != NULL && sec_tag != NULL)
 		{
@@ -231,10 +224,8 @@ void publish(char *topic, u_int8_t type, uint8_t qos)
 
 	if (json == NULL)
 	{
-		cJSON_Delete(json);
-
-		err = -ENOMEM;
-		return err;
+		LOG_ERR("Failed to create JSON object");
+		return;
 	}
 	printk("reset reason %s\n", sys_info.last_reboot_reason);
 	if (prov_set.rotate_cert == 1)
@@ -280,8 +271,6 @@ int validate_json(char *json_str) {
   cJSON *json = cJSON_Parse(json_str);
   if (json == NULL) {
     printf("Error parsing JSON: %s\n", cJSON_GetErrorPtr());
-
-    cJSON_Delete(json);
     return -1;
   }
   cJSON_Delete(json);
@@ -549,7 +538,7 @@ void aws_iot_event_handler(const struct aws_iot_evt *const evt)
 		break;
 	case AWS_IOT_EVT_CONNECTED:
 		LOG_INF("AWS_IOT_EVT_CONNECTED");
-		if (prov_set.rotate_cert == 2 && prov_set.verfiy_connectivity == 1)
+		if (prov_set.rotate_cert == 2 && prov_set.verify_connectivity == 1)
 		{
 
 			prov_set.rotate_cert = 3;
@@ -602,76 +591,58 @@ void aws_iot_event_handler(const struct aws_iot_evt *const evt)
 		{
 			mqtttopic_handler(evt);
 		}
-		 if (strncmp(evt->data.msg.topic.str, data_from_cloud_topic, strlen(data_from_cloud_topic)) == 0)
+		if (strncmp(evt->data.msg.topic.str, data_from_cloud_topic, strlen(data_from_cloud_topic)) == 0)
 		{
 			LOG_INF("Received message: \"%.*s\" on topic: \"%.*s\"", evt->data.msg.len,
-				   evt->data.msg.ptr, evt->data.msg.topic.len, evt->data.msg.topic.str);
-                        if (validate_json(evt->data.msg.ptr) == 0) {
-
-                          cJSON *json;
-                          char *unformatted_json = NULL;
-                          printk("VALID json string %s\n",
-                                 evt->data.msg.ptr);
-                          if (convert_to_unformatted(&json,
-                                                     evt->data.msg.ptr,
-                                                     &unformatted_json) == 0) {
-                            uart_send(unformatted_json);
-							uart_send("\n");
-                            //printk("unformatted json %s\n", unformatted_json);
-
-                            cJSON_free(unformatted_json);
-                            cJSON_Delete(json);
-                          } else {
-                            if (json) {
-                              cJSON_Delete(json);
-                            }
-                          }
-                          }
-                            //   convert_to_unformatted(evt->data.msg.ptr);
-                            // uart_send(evt->data.msg.ptr);
-                            // uart_send("\n");
-                          }
-                          //	else
-                          //{
-                          //	printf("Received message: \"%.*s\" on topic:
-                          //\"%.*s\"", evt->data.msg.len, 		   evt->data.msg.ptr,
-                          //evt->data.msg.topic.len, evt->data.msg.topic.str);
-                          //}
-
-                          break;
-                        case AWS_IOT_EVT_PUBACK:
-                          LOG_INF("AWS_IOT_EVT_PUBACK, message ID: %d",
-                                  evt->data.message_id);
-                          break;
-                        case AWS_IOT_EVT_PINGRESP:
-                          LOG_INF("AWS_IOT_EVT_PINGRESP");
-                          break;
-                        case AWS_IOT_EVT_FOTA_START:
-                          LOG_INF("AWS_IOT_EVT_FOTA_START");
-                          break;
-                        case AWS_IOT_EVT_FOTA_ERASE_PENDING:
-                          LOG_INF("AWS_IOT_EVT_FOTA_ERASE_PENDING");
-                          break;
-                        case AWS_IOT_EVT_FOTA_ERASE_DONE:
-                          LOG_INF("AWS_FOTA_EVT_ERASE_DONE");
-                          break;
-                        case AWS_IOT_EVT_FOTA_DONE:
-                          LOG_INF("AWS_IOT_EVT_FOTA_DONE");
-                          on_aws_iot_evt_fota_done(evt);
-                          break;
-                        case AWS_IOT_EVT_FOTA_DL_PROGRESS:
-                          LOG_INF("AWS_IOT_EVT_FOTA_DL_PROGRESS, (%d%%)",
-                                  evt->data.fota_progress);
-                          break;
-                        case AWS_IOT_EVT_ERROR:
-                          LOG_INF("AWS_IOT_EVT_ERROR, %d", evt->data.err);
-                          FATAL_ERROR();
-                          break;
-                        case AWS_IOT_EVT_FOTA_ERROR:
-                          LOG_INF("AWS_IOT_EVT_FOTA_ERROR");
-                          break;
-                        default:
-                          LOG_WRN("Unknown AWS IoT event type: %d", evt->type);
-                          break;
-                        }
+				evt->data.msg.ptr, evt->data.msg.topic.len, evt->data.msg.topic.str);
+			if (validate_json(evt->data.msg.ptr) == 0) {
+				cJSON *json;
+				char *unformatted_json = NULL;
+				printk("VALID json string %s\n", evt->data.msg.ptr);
+				if (convert_to_unformatted(&json, evt->data.msg.ptr, &unformatted_json) == 0) {
+					uart_send(unformatted_json);
+					uart_send("\n");
+					cJSON_free(unformatted_json);
+					cJSON_Delete(json);
+				} else {
+					if (json) {
+						cJSON_Delete(json);
+					}
+				}
+			}
+		}
+		break;
+	case AWS_IOT_EVT_PUBACK:
+		LOG_INF("AWS_IOT_EVT_PUBACK, message ID: %d", evt->data.message_id);
+		break;
+	case AWS_IOT_EVT_PINGRESP:
+		LOG_INF("AWS_IOT_EVT_PINGRESP");
+		break;
+	case AWS_IOT_EVT_FOTA_START:
+		LOG_INF("AWS_IOT_EVT_FOTA_START");
+		break;
+	case AWS_IOT_EVT_FOTA_ERASE_PENDING:
+		LOG_INF("AWS_IOT_EVT_FOTA_ERASE_PENDING");
+		break;
+	case AWS_IOT_EVT_FOTA_ERASE_DONE:
+		LOG_INF("AWS_FOTA_EVT_ERASE_DONE");
+		break;
+	case AWS_IOT_EVT_FOTA_DONE:
+		LOG_INF("AWS_IOT_EVT_FOTA_DONE");
+		on_aws_iot_evt_fota_done(evt);
+		break;
+	case AWS_IOT_EVT_FOTA_DL_PROGRESS:
+		LOG_INF("AWS_IOT_EVT_FOTA_DL_PROGRESS, (%d%%)", evt->data.fota_progress);
+		break;
+	case AWS_IOT_EVT_ERROR:
+		LOG_INF("AWS_IOT_EVT_ERROR, %d", evt->data.err);
+		FATAL_ERROR();
+		break;
+	case AWS_IOT_EVT_FOTA_ERROR:
+		LOG_INF("AWS_IOT_EVT_FOTA_ERROR");
+		break;
+	default:
+		LOG_WRN("Unknown AWS IoT event type: %d", evt->type);
+		break;
+	}
 }

@@ -32,7 +32,7 @@ struct provison_setting prov_set = {.device_provisioned = 0,
                                     .sec_tag = CONFIG_MQTT_HELPER_SEC_TAG,
                                     .old_sec_tag = 0,
                                     .thing_name = "",
-                                    .verfiy_connectivity = 0};
+                                    .verify_connectivity = 0};
 
 struct Sys_info sys_info = {
     .last_reboot_reason = "NONE",  

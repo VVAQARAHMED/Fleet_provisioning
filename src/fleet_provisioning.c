@@ -24,6 +24,23 @@
 
 LOG_MODULE_REGISTER(fleet_provision,CONFIG_AWS_IOT_SAMPLE_LOG_LEVEL);
 
+/* Certificate and key buffers for provisioning */
+static char client_certificate_new[2048];
+static size_t client_certificate_len_new;
+static char private_key_new[2048];
+static size_t private_key_len_new;
+static char key_cert_topic[40];
+static char key_cert_topic_get[75];
+
+/* CA certificate */
+static const unsigned char ca[] = {
+#if defined(MQTT_HELPER_CA_CERT_1)
+#include MQTT_HELPER_CA_CERT_1
+    (0x00)
+#else
+    ""
+#endif
+};
 
 static enum topic_type topic_filter(const char *topic, size_t topic_len)
 {
@@ -90,27 +107,34 @@ static enum topic_type topic_filter(const char *topic, size_t topic_len)
 		LOG_INF("Modem set in offline mode");
 
 		/* Write Private key */
-		//prov_set.sec_tag = CONFIG_MQTT_HELPER_SEC_TAG + 1;
 		err = modem_key_mgmt_write(prov_set.sec_tag, MODEM_KEY_MGMT_CRED_TYPE_PRIVATE_CERT,
 					   &private_key_new, private_key_len_new);
 		if (err) {
-			LOG_ERR("Failed writing private key to the modem");
+			LOG_ERR("Failed writing private key to the modem, error: %d", err);
+			lte_lc_connect();
+			return;
 		}
-		printk("Private key written on modem successfully,size of private key %d\n",private_key_len_new);
+		printk("Private key written on modem successfully, size: %d\n", private_key_len_new);
+
 		/* Write client certificate */
 		err = modem_key_mgmt_write(prov_set.sec_tag, MODEM_KEY_MGMT_CRED_TYPE_PUBLIC_CERT,
 					   &client_certificate_new, client_certificate_len_new);
 		if (err) {
-			LOG_ERR("Failed writing client certificate to the modem");
+			LOG_ERR("Failed writing client certificate to the modem, error: %d", err);
+			lte_lc_connect();
+			return;
 		}
-		printk("Client certificate written on modem successfully,,size of client certificate %d\n",client_certificate_len_new);
+		printk("Client certificate written on modem successfully, size: %d\n", client_certificate_len_new);
+
 		/* Write CA certificate */
 		err = modem_key_mgmt_write(prov_set.sec_tag, MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN, ca,
 					   sizeof(ca));
 		if (err) {
-			LOG_ERR("Failed writing client certificate to the modem");
+			LOG_ERR("Failed writing CA certificate to the modem, error: %d", err);
+			lte_lc_connect();
+			return;
 		}
-		printk("CA certificate written on modem successfully,size of CA %d\n",sizeof(ca));
+		printk("CA certificate written on modem successfully, size: %d\n", sizeof(ca));
 		LOG_INF("Credentials written to the modem!");
 		prov_set.device_provisioned = 1;
 		err=write_to_nvs(KEY_ID_PROVISION_STATUS,&prov_set.device_provisioned);
@@ -125,14 +149,9 @@ static enum topic_type topic_filter(const char *topic, size_t topic_len)
 		sys_reboot(0);
 		}
 
-		/* Connect to LTE.*/
-		prov_set.verfiy_connectivity=1;
+		/* Connect to LTE for certificate rotation verification */
+		prov_set.verify_connectivity = 1;
 		lte_lc_connect();
-
-
-		/* Schedule a new connection. */
-		// k_work_schedule(&connect_after_provisioning_work, K_SECONDS(1));
-		prov_set.device_provisioned = 1;
 	} else
 
 	{
@@ -141,12 +160,12 @@ static enum topic_type topic_filter(const char *topic, size_t topic_len)
 }
 
 
- void credentials_get()
+int credentials_get(void)
 {
 	int err = 0;
 	err = snprintk(key_cert_topic_get, sizeof(key_cert_topic_get), CRED_CREATE_TOPIC,
 		       prov_set.thing_name);
-	if ((err < 0) && (err >= CRED_CREATE_TOPIC_LEN)) {
+	if (err < 0 || err >= sizeof(key_cert_topic_get)) {
 		return -ENOMEM;
 	}
 
@@ -164,7 +183,8 @@ static enum topic_type topic_filter(const char *topic, size_t topic_len)
 	err = aws_iot_send(&tx_data);
 	if (err) {
 		LOG_INF("aws_iot_send, error: %d", err);
+		return err;
 	}
 
-	// shadow_update(false);
+	return 0;
 }
